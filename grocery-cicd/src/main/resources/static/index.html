@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Grocery Inventory</title>
+    <style>
+        body {
+            font-family: Arial;
+            margin: 30px;
+            background: #f4f4f4;
+        }
+
+        h1 {
+            color: #2c3e50;
+        }
+
+        input {
+            margin: 5px;
+            padding: 8px;
+        }
+
+        button {
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+
+        table {
+            margin-top: 20px;
+            width: 100%;
+            background: white;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+
+<h1>Grocery Inventory System</h1>
+
+<h3>Add Item</h3>
+
+<input type="text" id="name" placeholder="Name">
+<input type="text" id="category" placeholder="Category">
+<input type="number" id="price" placeholder="Price">
+<input type="number" id="quantity" placeholder="Quantity">
+
+<button onclick="addItem()">Add Item</button>
+
+<h3>Items List</h3>
+
+<button onclick="loadItems()">Refresh</button>
+
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Category</th>
+            <th>Price</th>
+            <th>Quantity</th>
+        </tr>
+    </thead>
+    <tbody id="itemsTable"></tbody>
+</table>
+
+<script>
+const API = "http://localhost:8081/api/items";
+
+// Load all items
+function loadItems() {
+    fetch(API)
+    .then(res => res.json())
+    .then(data => {
+        let rows = "";
+        data.forEach(item => {
+            rows += `
+                <tr>
+                    <td>${item.id}</td>
+                    <td>${item.name}</td>
+                    <td>${item.category}</td>
+                    <td>${item.price}</td>
+                    <td>${item.quantity}</td>
+                </tr>
+            `;
+        });
+        document.getElementById("itemsTable").innerHTML = rows;
+    });
+}
+
+// Add item
+function addItem() {
+    const item = {
+        name: document.getElementById("name").value,
+        category: document.getElementById("category").value,
+        price: document.getElementById("price").value,
+        quantity: document.getElementById("quantity").value
+    };
+
+    fetch(API, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(item)
+    })
+    .then(() => {
+        alert("Item Added!");
+        loadItems();
+    });
+}
+
+// initial load
+loadItems();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,127 @@
+---
+# Ansible Playbook — Configure nodes and deploy Grocery Inventory App
+# Usage: ansible-playbook -i inventory.ini playbook.yml
+
+- name: Configure Kubernetes Worker Nodes
+  hosts: k8s_nodes
+  become: yes
+  vars:
+    docker_image: "Shreyamtl/grocery-inventory:latest"
+    app_port: 8080
+
+  tasks:
+
+    - name: Update apt package cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install required system packages
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+        state: present
+
+    - name: Install Docker
+      apt:
+        name: docker.io
+        state: present
+
+    - name: Start and enable Docker service
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Add ubuntu user to docker group
+      user:
+        name: ubuntu
+        groups: docker
+        append: yes
+
+    - name: Pull latest Docker image
+      community.docker.docker_image:
+        name: "{{ docker_image }}"
+        source: pull
+        force_source: yes
+
+    - name: Install kubectl
+      shell: |
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+      args:
+        creates: /usr/local/bin/kubectl
+
+    - name: Create app directory
+      file:
+        path: /opt/grocery-app
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: '0755'
+
+    - name: Copy Kubernetes manifests to node
+      copy:
+        src: "../k8s/"
+        dest: /opt/grocery-app/k8s/
+        owner: ubuntu
+        group: ubuntu
+
+    - name: Verify Docker is running
+      command: docker info
+      register: docker_info
+      changed_when: false
+
+    - name: Display Docker info
+      debug:
+        msg: "Docker is running on {{ inventory_hostname }}"
+
+- name: Deploy Application via Kubernetes
+  hosts: k8s_master
+  become: yes
+  vars:
+    docker_image: "yourdockerhubusername/grocery-inventory:latest"
+    k8s_namespace: "grocery-app"
+
+  tasks:
+
+    - name: Create Kubernetes namespace
+      command: >
+        kubectl create namespace {{ k8s_namespace }} --dry-run=client -o yaml | kubectl apply -f -
+      changed_when: false
+
+    - name: Apply Kubernetes manifests
+      command: kubectl apply -f /opt/grocery-app/k8s/ -n {{ k8s_namespace }}
+      register: k8s_apply
+
+    - name: Show apply output
+      debug:
+        var: k8s_apply.stdout_lines
+
+    - name: Wait for deployment to be ready
+      command: >
+        kubectl rollout status deployment/grocery-deployment
+        -n {{ k8s_namespace }} --timeout=120s
+      register: rollout_status
+
+    - name: Verify pods are running
+      command: kubectl get pods -n {{ k8s_namespace }}
+      register: pods_status
+      changed_when: false
+
+    - name: Display pod status
+      debug:
+        var: pods_status.stdout_lines
+
+    - name: Get service details
+      command: kubectl get svc -n {{ k8s_namespace }}
+      register: svc_status
+      changed_when: false
+
+    - name: Display service info
+      debug:
+        var: svc_status.stdout_lines

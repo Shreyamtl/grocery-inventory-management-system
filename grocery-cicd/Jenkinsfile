@@ -1,0 +1,145 @@
+pipeline {
+    agent any
+
+    environment {
+        APP_NAME        = 'grocery-inventory'
+        DOCKER_IMAGE    = "Shreyamtl/${APP_NAME}"
+        DOCKER_TAG      = "${BUILD_NUMBER}"
+        DOCKER_REGISTRY = 'https://index.docker.io/v1/'
+        K8S_NAMESPACE   = 'grocery-app'
+        ANSIBLE_DIR     = 'ansible'
+    }
+
+    tools {
+        maven 'Maven-3.9'
+        jdk   'JDK-17'
+    }
+
+    stages {
+
+        // ── Stage 1: Checkout ────────────────────────────────────────────────
+        stage('Checkout') {
+            steps {
+                echo '>>> Cloning repository...'
+                checkout scm
+                echo ">>> Branch: ${env.GIT_BRANCH}"
+                echo ">>> Commit: ${env.GIT_COMMIT}"
+            }
+        }
+
+        // ── Stage 2: Build ───────────────────────────────────────────────────
+        stage('Build') {
+            steps {
+                echo '>>> Building with Maven...'
+                sh 'mvn clean compile -q'
+            }
+        }
+
+        // ── Stage 3: Test ────────────────────────────────────────────────────
+        stage('Test') {
+            steps {
+                echo '>>> Running unit tests...'
+                sh 'mvn test'
+            }
+            post {
+                always {
+                    junit 'target/surefire-reports/*.xml'
+                }
+            }
+        }
+
+        // ── Stage 4: Package ─────────────────────────────────────────────────
+        stage('Package') {
+            steps {
+                echo '>>> Packaging JAR...'
+                sh 'mvn package -DskipTests -q'
+                archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+            }
+        }
+
+        // ── Stage 5: Docker Build ────────────────────────────────────────────
+        stage('Docker Build') {
+            steps {
+                echo ">>> Building Docker image: ${DOCKER_IMAGE}:${DOCKER_TAG}"
+                sh """
+                    docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
+                    docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest
+                """
+            }
+        }
+
+        // ── Stage 6: Docker Push ─────────────────────────────────────────────
+        stage('Docker Push') {
+            steps {
+                echo '>>> Pushing image to Docker Hub...'
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-credentials',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh """
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
+                        docker push ${DOCKER_IMAGE}:latest
+                    """
+                }
+            }
+        }
+
+        // ── Stage 7: Ansible Deploy ──────────────────────────────────────────
+        stage('Ansible: Configure K8s Node') {
+            steps {
+                echo '>>> Running Ansible playbook to configure deployment node...'
+                sh """
+                    ansible-playbook -i ${ANSIBLE_DIR}/inventory.ini \
+                        ${ANSIBLE_DIR}/playbook.yml \
+                        --extra-vars "docker_image=${DOCKER_IMAGE}:${DOCKER_TAG}" \
+                        -v
+                """
+            }
+        }
+
+        // ── Stage 8: Kubernetes Deploy ───────────────────────────────────────
+        stage('Kubernetes Deploy') {
+            steps {
+                echo '>>> Deploying to Kubernetes...'
+                sh """
+                    kubectl create namespace ${K8S_NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
+                    kubectl apply -f k8s/ -n ${K8S_NAMESPACE}
+                    kubectl set image deployment/grocery-deployment \
+                        grocery-container=${DOCKER_IMAGE}:${DOCKER_TAG} \
+                        -n ${K8S_NAMESPACE}
+                    kubectl rollout status deployment/grocery-deployment -n ${K8S_NAMESPACE} --timeout=120s
+                """
+            }
+        }
+
+        // ── Stage 9: Smoke Test ──────────────────────────────────────────────
+        stage('Smoke Test') {
+            steps {
+                echo '>>> Running smoke test against deployed service...'
+                sh """
+                    sleep 15
+                    SERVICE_IP=\$(kubectl get svc grocery-service -n ${K8S_NAMESPACE} \
+                        -o jsonpath='{.spec.clusterIP}')
+                    curl -f http://\${SERVICE_IP}:8080/api/items/health || exit 1
+                    echo ">>> Smoke test PASSED"
+                """
+            }
+        }
+    }
+
+    post {
+        success {
+            echo ">>> Pipeline SUCCESS - Image: ${DOCKER_IMAGE}:${DOCKER_TAG}"
+        }
+        failure {
+            echo '>>> Pipeline FAILED - check logs above'
+            // Optional: mail or Slack notification here
+        }
+        always {
+            sh 'docker rmi ${DOCKER_IMAGE}:${DOCKER_TAG} || true'
+            cleanWs()
+        }
+    }
+}
