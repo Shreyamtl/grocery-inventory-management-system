@@ -120,7 +120,9 @@ loadItems();
 
 </body>
 </html> -->
-<!DOCTYPE html>
+
+<!-- new -->
+<!-- <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -244,7 +246,7 @@ loadItems();
         <input type="text" id="category" placeholder="Category">
         <input type="number" id="price" placeholder="Price">
         <input type="number" id="quantity" placeholder="Quantity">
-        <button class="add-btn" onclick="addItem()">Add Item</button>
+        <button class="add-btn" onclick="addItem()">Save</button>
     </div>
 
     <button class="refresh-btn" onclick="loadItems()">Refresh</button>
@@ -323,6 +325,227 @@ function deleteItem(id) {
         loadItems();
     })
     .catch(err => alert("Error deleting item"));
+}
+
+loadItems();
+</script>
+
+</body>
+</html> -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grocery Inventory</title>
+
+<style>
+    body {
+        font-family: 'Segoe UI', sans-serif;
+        margin: 0;
+        background: linear-gradient(135deg, #74ebd5, #ACB6E5);
+    }
+    
+
+    .navbar {
+        background: #2c3e50;
+        padding: 15px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        color: white;
+    }
+
+    .navbar button {
+        background: #3498db;
+        color: white;
+        border: none;
+        padding: 8px 15px;
+        margin-left: 10px;
+        border-radius: 6px;
+    }
+
+    .container {
+        max-width: 1000px;
+        margin: 30px auto;
+        background: white;
+        padding: 25px;
+        border-radius: 15px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    }
+
+    h1 {
+        text-align: center;
+        color: #2c3e50;
+    }
+
+    .form-section {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+
+    input {
+        padding: 10px;
+        border-radius: 8px;
+        border: 1px solid #ccc;
+    }
+
+    button {
+        padding: 10px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: bold;
+    }
+
+    .add-btn { background: #2ecc71; color: white; }
+    .edit-btn { background: #f39c12; color: white; }
+    .delete-btn { background: #e74c3c; color: white; }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+    th {
+        background: #34495e;
+        color: white;
+        padding: 12px;
+    }
+
+    td {
+        padding: 10px;
+        text-align: center;
+    }
+
+    tr:nth-child(even) { background: #f2f2f2; }
+    tr:hover { background: #dff9fb; }
+</style>
+</head>
+
+<body>
+
+<div class="navbar">
+    <div class="logo"><h2>🛒 Grocery Store Management System</h2></div>
+    <div>
+        <button onclick="loadItems()">Home</button>
+        <button onclick="alert('Dashboard coming soon')">Dashboard</button>
+    </div>
+</div>
+
+<div class="container">
+    <h1>Inventory</h1>
+
+    <div class="form-section">
+        <input type="hidden" id="itemId">
+        <input type="text" id="name" placeholder="Item Name">
+        <input type="text" id="category" placeholder="Category">
+        <input type="number" id="price" placeholder="Price">
+        <input type="number" id="quantity" placeholder="Quantity">
+        <button class="add-btn" onclick="saveItem()">Save</button>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Category</th>
+                <th>Price</th>
+                <th>Quantity</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="itemsTable"></tbody>
+    </table>
+</div>
+
+<script>
+const API = "http://localhost:8081/api/items";
+
+function loadItems() {
+    fetch(API)
+    .then(res => res.json())
+    .then(data => {
+        let rows = "";
+        data.forEach(item => {
+            rows += `
+                <tr>
+                    <td>${item.id}</td>
+                    <td>${item.name}</td>
+                    <td>${item.category}</td>
+                    <td>₹${item.price}</td>
+                    <td>${item.quantity}</td>
+                    <td>
+                        <button class="edit-btn" onclick="editItem(${item.id}, '${item.name}', '${item.category}', ${item.price}, ${item.quantity})">Edit</button>
+                        <button class="delete-btn" onclick="deleteItem(${item.id})">Delete</button>
+                    </td>
+                </tr>
+            `;
+        });
+        document.getElementById("itemsTable").innerHTML = rows;
+    });
+}
+
+function saveItem() {
+    const id = document.getElementById("itemId").value;
+
+    const item = {
+        name: document.getElementById("name").value,
+        category: document.getElementById("category").value,
+        price: parseFloat(document.getElementById("price").value),
+        quantity: parseInt(document.getElementById("quantity").value)
+    };
+
+    if (id) {
+        // ⚠️ Requires backend PUT API
+        fetch(`${API}/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(item)
+        })
+        .then(() => {
+            alert("Updated!");
+            resetForm();
+            loadItems();
+        });
+    } else {
+        fetch(API, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(item)
+        })
+        .then(() => {
+            alert("Added!");
+            loadItems();
+        });
+    }
+}
+
+function editItem(id, name, category, price, quantity) {
+    document.getElementById("itemId").value = id;
+    document.getElementById("name").value = name;
+    document.getElementById("category").value = category;
+    document.getElementById("price").value = price;
+    document.getElementById("quantity").value = quantity;
+}
+
+function deleteItem(id) {
+    fetch(`${API}/${id}`, { method: "DELETE" })
+    .then(() => loadItems());
+}
+
+function resetForm() {
+    document.getElementById("itemId").value = "";
+    document.getElementById("name").value = "";
+    document.getElementById("category").value = "";
+    document.getElementById("price").value = "";
+    document.getElementById("quantity").value = "";
 }
 
 loadItems();

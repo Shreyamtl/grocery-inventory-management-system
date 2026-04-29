@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: grocery-container
-          image: Shreyamtl/grocery-inventory:latest
+          image: shreyamtl/grocery-inventory:1.0
           imagePullPolicy: Always
           ports:
             - containerPort: 8080

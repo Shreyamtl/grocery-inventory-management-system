@@ -6,7 +6,7 @@
   hosts: k8s_nodes
   become: yes
   vars:
-    docker_image: "Shreyamtl/grocery-inventory:latest"
+    docker_image: "shreyamtl/grocery-inventory:latest"
     app_port: 8080
 
   tasks:
