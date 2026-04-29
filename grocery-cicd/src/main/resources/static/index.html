@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html>
 <head>
     <title>Grocery Inventory</title>
@@ -115,6 +115,216 @@ function addItem() {
 }
 
 // initial load
+loadItems();
+</script>
+
+</body>
+</html> -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grocery Inventory</title>
+
+<style>
+    body {
+        font-family: 'Segoe UI', sans-serif;
+        margin: 0;
+        background: linear-gradient(135deg, #74ebd5, #ACB6E5);
+    }
+
+    .container {
+        max-width: 1000px;
+        margin: 40px auto;
+        background: white;
+        padding: 25px;
+        border-radius: 15px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    }
+
+    h1 {
+        text-align: center;
+        color: #2c3e50;
+    }
+
+    .form-section {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+
+    input {
+        padding: 10px;
+        border-radius: 8px;
+        border: 1px solid #ccc;
+        transition: 0.3s;
+    }
+
+    input:focus {
+        border-color: #3498db;
+        outline: none;
+        box-shadow: 0 0 5px #3498db;
+    }
+
+    button {
+        padding: 10px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: bold;
+        transition: 0.3s;
+    }
+
+    .add-btn {
+        background: #2ecc71;
+        color: white;
+    }
+
+    .add-btn:hover {
+        background: #27ae60;
+    }
+
+    .refresh-btn {
+        background: #3498db;
+        color: white;
+        margin-bottom: 15px;
+    }
+
+    .refresh-btn:hover {
+        background: #2980b9;
+    }
+
+    .delete-btn {
+        background: #e74c3c;
+        color: white;
+    }
+
+    .delete-btn:hover {
+        background: #c0392b;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+    th {
+        background: #34495e;
+        color: white;
+        padding: 12px;
+    }
+
+    td {
+        padding: 10px;
+        text-align: center;
+    }
+
+    tr:nth-child(even) {
+        background: #f2f2f2;
+    }
+
+    tr:hover {
+        background: #dff9fb;
+        transition: 0.3s;
+    }
+</style>
+</head>
+
+<body>
+
+<div class="container">
+    <h1>🛒 Grocery Inventory</h1>
+
+    <div class="form-section">
+        <input type="text" id="name" placeholder="Item Name">
+        <input type="text" id="category" placeholder="Category">
+        <input type="number" id="price" placeholder="Price">
+        <input type="number" id="quantity" placeholder="Quantity">
+        <button class="add-btn" onclick="addItem()">Add Item</button>
+    </div>
+
+    <button class="refresh-btn" onclick="loadItems()">Refresh</button>
+
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Category</th>
+                <th>Price</th>
+                <th>Quantity</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="itemsTable"></tbody>
+    </table>
+</div>
+
+<script>
+const API = "http://localhost:8081/api/items";
+
+function loadItems() {
+    fetch(API)
+    .then(res => res.json())
+    .then(data => {
+        let rows = "";
+        data.forEach(item => {
+            rows += `
+                <tr>
+                    <td>${item.id}</td>
+                    <td>${item.name}</td>
+                    <td>${item.category}</td>
+                    <td>₹${item.price}</td>
+                    <td>${item.quantity}</td>
+                    <td><button class="delete-btn" onclick="deleteItem(${item.id})">Delete</button></td>
+                </tr>
+            `;
+        });
+        document.getElementById("itemsTable").innerHTML = rows;
+    });
+}
+
+function addItem() {
+    const item = {
+        name: document.getElementById("name").value,
+        category: document.getElementById("category").value,
+        price: parseFloat(document.getElementById("price").value),
+        quantity: parseInt(document.getElementById("quantity").value)
+    };
+
+    fetch(API, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(item)
+    })
+    .then(res => {
+        if (!res.ok) throw new Error("Failed to add");
+        return res.json();
+    })
+    .then(() => {
+        alert(" Item Added!");
+        loadItems();
+    })
+    .catch(err => alert("Error adding item"));
+}
+
+function deleteItem(id) {
+    fetch(`${API}/${id}`, {
+        method: "DELETE"
+    })
+    .then(res => {
+        if (!res.ok) throw new Error("Delete failed");
+        loadItems();
+    })
+    .catch(err => alert("Error deleting item"));
+}
+
 loadItems();
 </script>
 
